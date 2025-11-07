@@ -66,6 +66,9 @@ class Simple_Content_Scraper_Data_Scraper
         $taxonomy = !empty($args['taxonomy']) ? $args['taxonomy'] : '';
         $enable_slug_matching = !empty($args['enable_slug_matching']) ? $args['enable_slug_matching'] : false;
         $url_slug_part = !empty($args['url_slug_part']) ? $args['url_slug_part'] : 'last';
+        $remove_language_slug = !empty($args['remove_language_slug']) ? $args['remove_language_slug'] : false;
+        $language_slug = !empty($args['language_slug']) ? $args['language_slug'] : '';
+        $create_hierarchy = !empty($args['create_hierarchy']) ? $args['create_hierarchy'] : false;
 
         // Loop through the URL's
         foreach ($args['urls'] as $url) {
@@ -83,7 +86,10 @@ class Simple_Content_Scraper_Data_Scraper
                 'post_type'                 => $post_type,
                 'taxonomy'                  => $taxonomy,
                 'enable_slug_matching'      => $enable_slug_matching,
-                'url_slug_part'             => $url_slug_part
+                'url_slug_part'             => $url_slug_part,
+                'remove_language_slug'      => $remove_language_slug,
+                'language_slug'             => $language_slug,
+                'create_hierarchy'          => $create_hierarchy
             ]]);
         }
     }
@@ -139,6 +145,9 @@ class Simple_Content_Scraper_Data_Scraper
         $taxonomy = !empty($args['taxonomy']) ? $args['taxonomy'] : '';
         $enable_slug_matching = !empty($args['enable_slug_matching']) ? $args['enable_slug_matching'] : false;
         $url_slug_part = !empty($args['url_slug_part']) ? $args['url_slug_part'] : 'last';
+        $remove_language_slug = !empty($args['remove_language_slug']) ? $args['remove_language_slug'] : false;
+        $language_slug = !empty($args['language_slug']) ? $args['language_slug'] : '';
+        $create_hierarchy = !empty($args['create_hierarchy']) ? $args['create_hierarchy'] : false;
 
         // Scrape the URL and get the data from this URL based on the Element ID's
         $scraped_data = $this->simco_scrape_url($url, $title_element_id, $content_element_id, $image_element_id, $date_element_id, $category_element_id, $category_seperator);
@@ -146,10 +155,10 @@ class Simple_Content_Scraper_Data_Scraper
         // Handle based on import type
         if ($import_type === 'taxonomy') {
             // Handle taxonomy import
-            $this->simco_create_or_update_taxonomy($url, $scraped_data, $taxonomy, $enable_slug_matching, $url_slug_part);
+            $this->simco_create_or_update_taxonomy($url, $scraped_data, $taxonomy, $enable_slug_matching, $url_slug_part, $remove_language_slug, $language_slug);
         } else {
-            // Handle post import (existing functionality)
-            $this->simco_create_or_update_post($post_id, $scraped_data, $post_type);
+            // Handle post import with URL slug functionality
+            $this->simco_create_or_update_post($post_id, $url, $scraped_data, $post_type, $enable_slug_matching, $url_slug_part, $remove_language_slug, $language_slug, $create_hierarchy);
         }
     }
 
@@ -394,42 +403,96 @@ class Simple_Content_Scraper_Data_Scraper
     }
 
     /**
-     * Create or update post
+     * Create or update post with URL slug functionality
      */
-    private function simco_create_or_update_post($post_id = null, $scraped_data = null, $post_type = 'post')
+    private function simco_create_or_update_post($post_id = null, $url = '', $scraped_data = null, $post_type = 'post', $enable_slug_matching = false, $url_slug_part = 'last', $remove_language_slug = false, $language_slug = '', $create_hierarchy = false)
     {
-        // Check if $post_data is not empty, otherwise throw an error
+        // Check if $scraped_data is not empty, otherwise throw an error
         if (empty($scraped_data)) {
-            // Trow an error
             throw new Exception('Error: (simco_create_or_update_post) No $scraped_data found.');
         }
 
-        // Check if $scraped_data contains the title, content, image, date and categories
+        // Extract data from scraped_data
         $title = !empty($scraped_data['title']) ? $scraped_data['title'] : '';
         $content = !empty($scraped_data['content']) ? $scraped_data['content'] : '';
         $image = !empty($scraped_data['image']) ? $scraped_data['image'] : '';
         $date = !empty($scraped_data['date']) ? $scraped_data['date'] : '';
         $categories = !empty($scraped_data['categories']) ? $scraped_data['categories'] : [];
 
-        // If $post_id is null we create a new post, otherwise we update the post
+        $parent_id = 0;
+        $post_slug = '';
+
+        // Handle URL slug matching and hierarchy creation if enabled
+        if ($enable_slug_matching && !empty($url)) {
+            if ($create_hierarchy) {
+                // Extract hierarchical path for creating parent structure
+                $path_parts = $this->simco_extract_hierarchical_path($url, $url_slug_part, $remove_language_slug, $language_slug);
+                
+                if (!empty($path_parts) && count($path_parts) > 1) {
+                    // Create hierarchy excluding the last part (which will be our post)
+                    $parent_parts = array_slice($path_parts, 0, -1);
+                    if (!empty($parent_parts)) {
+                        $parent_id = $this->simco_create_post_hierarchy($parent_parts, $post_type);
+                    }
+                    
+                    // Use the last part as our post slug
+                    $post_slug = end($path_parts);
+                } elseif (!empty($path_parts)) {
+                    // Single part, use it as slug
+                    $post_slug = end($path_parts);
+                }
+            } else {
+                // Extract single slug part
+                $post_slug = $this->simco_extract_url_slug_part($url, $url_slug_part, $remove_language_slug, $language_slug);
+            }
+
+            // Try to find existing post by slug if no post_id provided
+            if (empty($post_id) && !empty($post_slug)) {
+                $existing_post = $this->simco_find_post_by_slug($post_type, $post_slug);
+                if ($existing_post) {
+                    $post_id = $existing_post->ID;
+                }
+            }
+        }
+
+        // Create or update post
         if (empty($post_id)) {
-            // Create the post
-            $post_id = wp_insert_post([
+            // Prepare post arguments
+            $post_args = [
                 'post_title' => $title,
                 'post_type' => $post_type,
-                'post_status' => 'publish'
-            ]);
+                'post_status' => 'publish',
+                'post_parent' => $parent_id
+            ];
+
+            // Add post slug if available
+            if (!empty($post_slug)) {
+                $post_args['post_name'] = $post_slug;
+            }
+
+            // Create the post
+            $post_id = wp_insert_post($post_args);
         } else {
-            // Update the post title of the existing post
-            wp_update_post([
+            // Update existing post
+            $update_args = [
                 'ID' => $post_id,
                 'post_title' => $title,
-            ]);
+                'post_parent' => $parent_id
+            ];
+
+            // Update post slug if available and different
+            if (!empty($post_slug)) {
+                $current_post = get_post($post_id);
+                if ($current_post && $current_post->post_name !== $post_slug) {
+                    $update_args['post_name'] = $post_slug;
+                }
+            }
+
+            wp_update_post($update_args);
         }
 
         // Update the content if not empty
         if (!empty($content)) {
-            // Update the post content
             wp_update_post([
                 'ID' => $post_id,
                 'post_content' => $content,
@@ -442,41 +505,38 @@ class Simple_Content_Scraper_Data_Scraper
             $image_id = $this->simco_upload_image($image, $post_id, 'Afbeelding', 'Afbeelding', 'image_');
 
             // Update the post thumbnail
-            set_post_thumbnail($post_id, $image_id);
+            if (!empty($image_id)) {
+                set_post_thumbnail($post_id, $image_id);
+            }
         }
 
         // Update the date if not empty
         if (!empty($date)) {
-            $date = DateTime::createFromFormat('d-m-Y', $date);
-            $formattedDate = $date->format('Y-m-d'); // Convert to YYYY-MM-DD format
-
-            // Update the post date
-            wp_update_post([
-                'ID' => $post_id,
-                'post_date' => $formattedDate,
-            ]);
+            $date_obj = DateTime::createFromFormat('d-m-Y', $date);
+            if ($date_obj) {
+                $formatted_date = $date_obj->format('Y-m-d H:i:s');
+                wp_update_post([
+                    'ID' => $post_id,
+                    'post_date' => $formatted_date,
+                ]);
+            }
         }
 
         // Update the categories if not empty
         if (!empty($categories)) {
-            // Get the category ID's
             $category_ids = [];
 
             foreach ($categories as $category) {
-                // Check if the category is not empty
                 if (!empty($category)) {
                     // Get the category by name
                     $category_id = get_cat_ID($category);
 
-                    // Check if the category ID is not empty
                     if (!empty($category_id)) {
-                        // Add the category ID to the category ID's array
                         $category_ids[] = $category_id;
                     } else {
                         // Create the category
                         $new_cat = wp_insert_term($category, 'category');
 
-                        // Check if the $new_cat is not empty and no WP error
                         if (!empty($new_cat) && !is_wp_error($new_cat)) {
                             $category_ids[] = $new_cat['term_id'];
                         }
@@ -485,16 +545,17 @@ class Simple_Content_Scraper_Data_Scraper
             }
 
             // Update the post categories
-            wp_set_post_categories($post_id, $category_ids);
+            if (!empty($category_ids)) {
+                wp_set_post_categories($post_id, $category_ids);
+            }
         }
 
         // Check if the post_id is empty
         if (empty($post_id)) {
-            // Trow an error
             throw new Exception('Error: (simco_create_or_update_post) Could not create the post.');
         }
 
-        return;
+        return $post_id;
     }
 
     /**
@@ -607,9 +668,9 @@ class Simple_Content_Scraper_Data_Scraper
     }
 
     /**
-     * Extract URL slug part for taxonomy matching
+     * Extract URL slug part for taxonomy and post matching
      */
-    private function simco_extract_url_slug_part($url, $part_position = 'last')
+    private function simco_extract_url_slug_part($url, $part_position = 'last', $remove_language_slug = false, $language_slug = '')
     {
         // Parse the URL to get the path
         $parsed_url = parse_url($url);
@@ -627,6 +688,15 @@ class Simple_Content_Scraper_Data_Scraper
         // Re-index array after filtering
         $parts = array_values($parts);
         
+        // Remove language slug if specified
+        if ($remove_language_slug && !empty($language_slug)) {
+            $parts = array_filter($parts, function($part) use ($language_slug) {
+                return $part !== $language_slug;
+            });
+            // Re-index array after filtering
+            $parts = array_values($parts);
+        }
+        
         if (empty($parts)) {
             return '';
         }
@@ -641,6 +711,56 @@ class Simple_Content_Scraper_Data_Scraper
                 return count($parts) >= 3 ? $parts[count($parts) - 3] : '';
             default:
                 return end($parts);
+        }
+    }
+
+    /**
+     * Extract hierarchical URL path for post structure creation
+     */
+    private function simco_extract_hierarchical_path($url, $part_position = 'last', $remove_language_slug = false, $language_slug = '')
+    {
+        // Parse the URL to get the path
+        $parsed_url = parse_url($url);
+        $path = isset($parsed_url['path']) ? $parsed_url['path'] : '';
+        
+        // Remove leading and trailing slashes, then split by slashes
+        $path = trim($path, '/');
+        $parts = explode('/', $path);
+        
+        // Filter out empty parts
+        $parts = array_filter($parts, function($part) {
+            return !empty($part);
+        });
+        
+        // Re-index array after filtering
+        $parts = array_values($parts);
+        
+        // Remove language slug if specified
+        if ($remove_language_slug && !empty($language_slug)) {
+            $parts = array_filter($parts, function($part) use ($language_slug) {
+                return $part !== $language_slug;
+            });
+            // Re-index array after filtering
+            $parts = array_values($parts);
+        }
+        
+        if (empty($parts)) {
+            return [];
+        }
+        
+        // Determine how many parts to return based on position
+        switch ($part_position) {
+            case 'last':
+                // Return all parts up to and including the last
+                return $parts;
+            case 'second_last':
+                // Return all parts up to and including the second to last
+                return count($parts) >= 2 ? array_slice($parts, 0, count($parts) - 1) : $parts;
+            case 'third_last':
+                // Return all parts up to and including the third to last
+                return count($parts) >= 3 ? array_slice($parts, 0, count($parts) - 2) : $parts;
+            default:
+                return $parts;
         }
     }
 
@@ -676,9 +796,98 @@ class Simple_Content_Scraper_Data_Scraper
     }
 
     /**
+     * Find existing post by slug match
+     */
+    private function simco_find_post_by_slug($post_type, $slug_part)
+    {
+        if (empty($slug_part) || empty($post_type)) {
+            return null;
+        }
+
+        // Get all posts for the post type
+        $posts = get_posts([
+            'post_type' => $post_type,
+            'post_status' => ['publish', 'draft', 'pending', 'private'],
+            'numberposts' => -1,
+            'meta_query' => []
+        ]);
+
+        if (empty($posts)) {
+            return null;
+        }
+
+        // Look for exact slug match or partial slug match
+        foreach ($posts as $post) {
+            // Check if the slug contains the slug part or if the slug part contains the post slug
+            if (strpos($post->post_name, $slug_part) !== false || strpos($slug_part, $post->post_name) !== false) {
+                return $post;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Find or create post hierarchy based on URL path
+     */
+    private function simco_create_post_hierarchy($path_parts, $post_type)
+    {
+        if (empty($path_parts) || !is_array($path_parts)) {
+            return 0;
+        }
+
+        $parent_id = 0;
+        
+        // Create hierarchy level by level
+        foreach ($path_parts as $index => $slug) {
+            // Skip empty slugs
+            if (empty($slug)) {
+                continue;
+            }
+
+            // Check if post with this slug already exists at this level
+            $existing_post = get_posts([
+                'post_type' => $post_type,
+                'name' => $slug,
+                'post_parent' => $parent_id,
+                'post_status' => ['publish', 'draft', 'pending', 'private'],
+                'numberposts' => 1
+            ]);
+
+            if (!empty($existing_post)) {
+                // Use existing post as parent for next level
+                $parent_id = $existing_post[0]->ID;
+            } else {
+                // Create new post for this level
+                $post_title = ucwords(str_replace(['-', '_'], ' ', $slug));
+                
+                $post_args = [
+                    'post_title' => $post_title,
+                    'post_name' => $slug,
+                    'post_type' => $post_type,
+                    'post_status' => 'publish',
+                    'post_parent' => $parent_id,
+                    'post_content' => ''
+                ];
+
+                $new_post_id = wp_insert_post($post_args);
+                
+                if (!is_wp_error($new_post_id)) {
+                    $parent_id = $new_post_id;
+                } else {
+                    // If we can't create the post, return the current parent
+                    break;
+                }
+            }
+        }
+
+        return $parent_id;
+    }
+
+    /**
      * Create or update taxonomy
      */
-    private function simco_create_or_update_taxonomy($url, $scraped_data, $taxonomy, $enable_slug_matching = false, $url_slug_part = 'last')
+    private function simco_create_or_update_taxonomy($url, $scraped_data, $taxonomy, $enable_slug_matching = false, $url_slug_part = 'last', $remove_language_slug = false, $language_slug = '')
     {
         // Check if scraped_data is valid
         if (empty($scraped_data)) {
@@ -694,7 +903,7 @@ class Simple_Content_Scraper_Data_Scraper
 
         // Handle slug matching if enabled
         if ($enable_slug_matching) {
-            $extracted_slug = $this->simco_extract_url_slug_part($url, $url_slug_part);
+            $extracted_slug = $this->simco_extract_url_slug_part($url, $url_slug_part, $remove_language_slug, $language_slug);
             
             if (!empty($extracted_slug)) {
                 $existing_term = $this->simco_find_taxonomy_by_slug($taxonomy, $extracted_slug);
@@ -713,7 +922,7 @@ class Simple_Content_Scraper_Data_Scraper
             ]);
         } else {
             // Create new term
-            $slug = $enable_slug_matching ? $this->simco_extract_url_slug_part($url, $url_slug_part) : '';
+            $slug = $enable_slug_matching ? $this->simco_extract_url_slug_part($url, $url_slug_part, $remove_language_slug, $language_slug) : '';
             $term_args = [
                 'name' => $title,
                 'description' => wp_strip_all_tags($content)

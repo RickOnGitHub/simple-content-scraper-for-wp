@@ -43,12 +43,17 @@ class Simple_Content_Scraper_Admin_Ajax
         $category_element_id = !empty($_POST['category_element_id']) ? $_POST['category_element_id'] : '';
         $category_seperator = !empty($_POST['category_seperator']) ? $_POST['category_seperator'] : '';
         
-        // New taxonomy-related fields
+        // Import type and related fields
         $import_type = !empty($_POST['import_type']) ? $_POST['import_type'] : 'post';
         $post_type = !empty($_POST['post_type']) ? $_POST['post_type'] : 'post';
         $taxonomy = !empty($_POST['taxonomy']) ? $_POST['taxonomy'] : '';
         $enable_slug_matching = !empty($_POST['enable_slug_matching']) ? (bool) $_POST['enable_slug_matching'] : false;
         $url_slug_part = !empty($_POST['url_slug_part']) ? $_POST['url_slug_part'] : 'last';
+        
+        // New URL slug functionality fields
+        $create_hierarchy = !empty($_POST['create_hierarchy']) ? (bool) $_POST['create_hierarchy'] : false;
+        $remove_language_slug = !empty($_POST['remove_language_slug']) ? (bool) $_POST['remove_language_slug'] : false;
+        $language_slug = !empty($_POST['language_slug']) ? sanitize_text_field($_POST['language_slug']) : '';
 
         // Validate taxonomy requirement if import_type is taxonomy
         if ($import_type === 'taxonomy' && empty($taxonomy)) {
@@ -85,7 +90,10 @@ class Simple_Content_Scraper_Admin_Ajax
                 'post_type' => $post_type,
                 'taxonomy' => $taxonomy,
                 'enable_slug_matching' => $enable_slug_matching,
-                'url_slug_part' => $url_slug_part
+                'url_slug_part' => $url_slug_part,
+                'create_hierarchy' => $create_hierarchy,
+                'remove_language_slug' => $remove_language_slug,
+                'language_slug' => $language_slug
             ];
             
             // Queue each batch as a separate task

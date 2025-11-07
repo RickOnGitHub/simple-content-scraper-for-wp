@@ -142,9 +142,9 @@ class Simple_Content_Scraper_Admin_Settings
             wp_die(__('Access denied. Only administrators can access this page.', 'simple-content-scraper'));
         }
 ?>
-        <div class="main-settings-wrap">
-            <div class="uk-section uk-section-muted ">
-                <div class="uk-container uk-container-expand">
+        <div class="main-settings-wrap simco-admin-page">
+            <div class="uk-section uk-section-muted">
+                <div class="uk-container uk-container-expand simco-admin-form">
                     <h3 class="uk-margin-remove-bottom">Content Scraper</h3>
                     <hr>
                     <!-- URL's to scrape -->
@@ -230,20 +230,78 @@ class Simple_Content_Scraper_Admin_Settings
                             <?php echo $this->simple_content_scraper_taxonomy_dropdown(); ?>
                         </div>
                     </div>
-                    <!-- URL slug matching settings (hidden by default) -->
-                    <div class="uk-margin" id="simco_slug_matching_section" style="display: none;">
+                    <!-- URL slug matching settings for taxonomy (hidden by default) -->
+                    <div class="uk-margin" id="simco_taxonomy_slug_matching_section" style="display: none;">
                         <div class="uk-grid uk-grid-small">
                             <div class="uk-width-1-1 uk-width-1-2@s">
-                                <label class="uk-form-label" for="simco_enable_slug_matching">
-                                    <input class="uk-checkbox" type="checkbox" name="simco_enable_slug_matching" id="simco_enable_slug_matching" value="1"> Enable slug matching
+                                <label class="simco-checkbox-wrapper" for="simco_enable_slug_matching_taxonomy">
+                                    <input type="checkbox" name="simco_enable_slug_matching_taxonomy" id="simco_enable_slug_matching_taxonomy" value="1">
+                                    <span class="simco-checkbox-visual"></span>
+                                    <span class="simco-checkbox-label">Enable slug matching</span>
                                 </label>
                                 <p class="uk-margin-remove-top uk-margin-remove-bottom">Match existing taxonomies by URL slug part.</p>
                             </div>
-                            <div class="uk-width-1-1 uk-width-1-2@s" id="simco_url_slug_part_section" style="display: none;">
-                                <label class="uk-form-label" for="simco_url_slug_part">URL Slug Part</label>
+                            <div class="uk-width-1-1 uk-width-1-2@s" id="simco_url_slug_part_taxonomy_section" style="display: none;">
+                                <label class="uk-form-label" for="simco_url_slug_part_taxonomy">URL Slug Part</label>
                                 <p class="uk-margin-remove-top uk-margin-remove-bottom">Choose which part of the URL to use for matching.</p>
                                 <div class="uk-form-controls">
-                                    <?php echo $this->simple_content_scraper_url_slug_part_dropdown(); ?>
+                                    <select name="simco_url_slug_part_taxonomy" id="simco_url_slug_part_taxonomy" class="uk-select">
+                                        <option value="last">Last part</option>
+                                        <option value="second_last">Second to last part</option>
+                                        <option value="third_last">Third to last part</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- URL slug matching settings for posts (hidden by default) -->
+                    <div class="uk-margin" id="simco_post_slug_matching_section" style="display: none;">
+                        <div class="uk-grid uk-grid-small uk-child-width-1-1 uk-child-width-1-2@s uk-child-width-1-3@m">
+                            <div>
+                                <label class="simco-checkbox-wrapper" for="simco_enable_slug_matching_post">
+                                    <input type="checkbox" name="simco_enable_slug_matching_post" id="simco_enable_slug_matching_post" value="1">
+                                    <span class="simco-checkbox-visual"></span>
+                                    <span class="simco-checkbox-label">Enable slug matching</span>
+                                </label>
+                                <p class="uk-margin-remove-top uk-margin-remove-bottom">Match existing posts by URL slug part.</p>
+                            </div>
+                            <div id="simco_url_slug_part_post_section" style="display: none;">
+                                <label class="uk-form-label" for="simco_url_slug_part_post">URL Slug Part</label>
+                                <p class="uk-margin-remove-top uk-margin-remove-bottom">Choose which part of the URL to use for matching.</p>
+                                <div class="uk-form-controls">
+                                    <select name="simco_url_slug_part_post" id="simco_url_slug_part_post" class="uk-select">
+                                        <option value="last">Last part</option>
+                                        <option value="second_last">Second to last part</option>
+                                        <option value="third_last">Third to last part</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="simco-checkbox-wrapper" for="simco_create_hierarchy">
+                                    <input type="checkbox" name="simco_create_hierarchy" id="simco_create_hierarchy" value="1">
+                                    <span class="simco-checkbox-visual"></span>
+                                    <span class="simco-checkbox-label">Create hierarchy</span>
+                                </label>
+                                <p class="uk-margin-remove-top uk-margin-remove-bottom">Create hierarchical post structure based on URL path.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Language slug removal settings (available for both post and taxonomy imports) -->
+                    <div class="uk-margin" id="simco_language_slug_section">
+                        <div class="uk-grid uk-grid-small">
+                            <div class="uk-width-1-1 uk-width-1-2@s">
+                                <label class="simco-checkbox-wrapper" for="simco_remove_language_slug">
+                                    <input type="checkbox" name="simco_remove_language_slug" id="simco_remove_language_slug" value="1">
+                                    <span class="simco-checkbox-visual"></span>
+                                    <span class="simco-checkbox-label">Remove language slug</span>
+                                </label>
+                                <p class="uk-margin-remove-top uk-margin-remove-bottom">Remove language slug from URL before processing (e.g., remove "/nl/" from URLs).</p>
+                            </div>
+                            <div class="uk-width-1-1 uk-width-1-2@s" id="simco_language_slug_input_section" style="display: none;">
+                                <label class="uk-form-label" for="simco_language_slug">Language Slug</label>
+                                <p class="uk-margin-remove-top uk-margin-remove-bottom">Enter the language slug to remove (e.g., "nl", "en", "fr").</p>
+                                <div class="uk-form-controls">
+                                    <input class="uk-input" type="text" name="simco_language_slug" id="simco_language_slug" value="" placeholder="e.g. nl, en, fr">
                                 </div>
                             </div>
                         </div>

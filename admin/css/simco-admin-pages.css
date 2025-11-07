@@ -42,3 +42,120 @@ button,
     margin: 0 0 20px 0 !important;
     border: none !important;
 }
+
+/* FRESH NEW CHECKBOX SYSTEM - NO CONFLICTS */
+
+/* Custom checkbox wrapper - completely isolated */
+.simco-checkbox-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    margin: 0;
+    cursor: pointer;
+    user-select: none;
+}
+
+/* Hide the actual checkbox input */
+.simco-checkbox-wrapper input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    margin: 0;
+    padding: 0;
+}
+
+/* Custom checkbox visual */
+.simco-checkbox-visual {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    background: #fff;
+    border: 1px solid #8c8f94;
+    border-radius: 2px;
+    margin-right: 8px;
+    flex-shrink: 0;
+    position: relative;
+    transition: all 0.1s ease-in-out;
+}
+
+/* Hover state */
+.simco-checkbox-wrapper:hover .simco-checkbox-visual {
+    border-color: #2271b1;
+}
+
+/* Focus state */
+.simco-checkbox-wrapper input[type="checkbox"]:focus + .simco-checkbox-visual {
+    border-color: #2271b1;
+    box-shadow: 0 0 0 1px #2271b1;
+}
+
+/* Checked state */
+.simco-checkbox-wrapper input[type="checkbox"]:checked + .simco-checkbox-visual {
+    background: #2271b1;
+    border-color: #2271b1;
+}
+
+/* Checkmark - Made more visible */
+.simco-checkbox-wrapper input[type="checkbox"]:checked + .simco-checkbox-visual::after {
+    content: '';
+    position: absolute;
+    left: 3px;
+    top: 0px;
+    width: 7px;
+    height: 8px;
+    border: solid #ffffff;
+    border-width: 0 3px 3px 0;
+    transform: rotate(45deg);
+    display: block !important;
+    z-index: 1;
+}
+
+/* Alternative checkmark using Unicode character as fallback */
+.simco-checkbox-wrapper input[type="checkbox"]:checked + .simco-checkbox-visual::before {
+    content: '✓';
+    position: absolute;
+    left: 2px;
+    top: -2px;
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+    line-height: 1;
+    display: none;
+}
+
+/* Show Unicode checkmark if CSS checkmark fails */
+.simco-checkbox-wrapper.fallback input[type="checkbox"]:checked + .simco-checkbox-visual::before {
+    display: block !important;
+}
+
+.simco-checkbox-wrapper.fallback input[type="checkbox"]:checked + .simco-checkbox-visual::after {
+    display: none !important;
+}
+
+/* Disabled state */
+.simco-checkbox-wrapper input[type="checkbox"]:disabled + .simco-checkbox-visual {
+    background: #f6f7f7;
+    border-color: #c3c4c7;
+    cursor: not-allowed;
+}
+
+.simco-checkbox-wrapper input[type="checkbox"]:disabled {
+    cursor: not-allowed;
+}
+
+/* Label text styling */
+.simco-checkbox-label {
+    font-size: 14px;
+    line-height: 1.4;
+    color: #1d2327;
+}
+
+/* Form integration */
+.simco-admin-form .uk-form-label {
+    margin-bottom: 8px !important;
+}
+
+.simco-admin-form .uk-margin {
+    margin-bottom: 20px !important;
+}
